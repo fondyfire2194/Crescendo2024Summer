@@ -26,6 +26,7 @@ import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.Constants.ArmConstants;
 import frc.robot.Constants.CameraConstants;
+import frc.robot.Constants.FieldConstants;
 import frc.robot.commands.CommandFactory;
 import frc.robot.commands.JogClimber;
 import frc.robot.commands.Arm.CheckArmAtTarget;
@@ -87,6 +88,8 @@ public class RobotContainer implements Logged {
 
         public boolean checkCAN;
 
+        private String commandname;
+
         public RobotContainer() {
 
                 registerNamedCommands();
@@ -115,7 +118,7 @@ public class RobotContainer implements Logged {
 
                 configureCommandScheduler();
 
-                setDefaultCommands();
+                // setDefaultCommands();
 
                 m_shooter.setBottomKpKdKi();
         }
@@ -240,10 +243,7 @@ public class RobotContainer implements Logged {
                 codriver.povLeft().whileTrue(Commands.runOnce(() -> m_transfer.transferMotor.setVoltage(-.5)))
                                 .onFalse(Commands.runOnce(() -> m_transfer.transferMotor.setVoltage(0)));
 
-                codriver.povRight().onTrue(new ParallelCommandGroup(
-                                m_intake.startIntakeCommand(),
-                                new TransferIntakeToSensor(m_transfer, m_intake),
-                                m_cf.autopickup()));
+                // codriver.povRight().onTrue(
 
                 codriver.start().onTrue(Commands.runOnce(() -> m_swerve.resetModuleEncoders()));
 
@@ -308,7 +308,6 @@ public class RobotContainer implements Logged {
                                                 () -> -driver.getRawAxis(4),
                                                 fieldCentric,
                                                 keepAngle));
-
         }
 
         public Command getAutonomousCommand() {
@@ -317,24 +316,6 @@ public class RobotContainer implements Logged {
 
         private void configureCommandScheduler() {
                 SmartDashboard.putData("CommSchd", CommandScheduler.getInstance());
-
-                // Set the scheduler to log Shuffleboard events for command initialize,
-                // interrupt, finish
-                CommandScheduler.getInstance()
-                                .onCommandInitialize(
-                                                command -> Shuffleboard.addEventMarker(
-                                                                "Command initialized", command.getName(),
-                                                                EventImportance.kNormal));
-                CommandScheduler.getInstance()
-                                .onCommandInterrupt(
-                                                command -> Shuffleboard.addEventMarker(
-                                                                "Command interrupted", command.getName(),
-                                                                EventImportance.kNormal));
-                CommandScheduler.getInstance()
-                                .onCommandFinish(
-                                                command -> Shuffleboard.addEventMarker(
-                                                                "Command finished", command.getName(),
-                                                                EventImportance.kNormal));
         }
 
         private void registerNamedCommands() {
@@ -343,72 +324,93 @@ public class RobotContainer implements Logged {
                                 m_shooter.stopShooterCommand(),
                                 m_intake.stopIntakeCommand(),
                                 m_transfer.stopTransferCommand(),
-                                m_arm.setGoalCommand(ArmConstants.pickupAngle).asProxy()));
+                                m_arm.setGoalCommand(ArmConstants.pickupAngle)
+                                                .withName("Reset All"))
+                                .asProxy());
 
-                NamedCommands.registerCommand("Arm Before Note 2", m_cf.positionArmRunShooterSpecialCase(44,
-                                3000).asProxy());
+                NamedCommands.registerCommand("Arm Shooter Pre Wing 2", m_cf.positionArmRunShooterSpecialCase(44,
+                                3000).asProxy()
+                                .withName("Arm Shooter Pre Wing 2"));
 
-                NamedCommands.registerCommand("Arm Note 2", m_cf.positionArmRunShooterSpecialCase(35,
-                                3200).asProxy());
+                NamedCommands.registerCommand("Arm Shooter Wing 2", m_cf.positionArmRunShooterSpecialCase(35,
+                                3200).asProxy()
+                                .withName("Arm Shooter Wing 2"));
 
-                // NamedCommands.registerCommand("Halt Intake",
-                // m_intake.stopIntakeCommand().asProxy());
+                NamedCommands.registerCommand("Prestart Shooter Wheels",
+                                m_shooter.startShooterCommand(4000).asProxy()
+                                                .withName("Prestart Shooter Wheels"));
 
-                NamedCommands.registerCommand("Prestart Shooter Wheels", m_shooter.startShooterCommand(4000).asProxy());
-
-                NamedCommands.registerCommand("Stop Intake", m_intake.stopIntakeCommand().asProxy());
-
-                NamedCommands.registerCommand(
-                                "Start Intake", m_intake.startIntakeCommand().asProxy());
-
-                NamedCommands.registerCommand(
-                                "DoIntake", m_cf.doIntake().asProxy());
+                NamedCommands.registerCommand("Stop Intake", m_intake.stopIntakeCommand().asProxy()
+                                .withName("Stop Intake"));
 
                 NamedCommands.registerCommand(
-                                "Transfer To Sensor", m_cf.runToSensorCommand().asProxy());
+                                "Start Intake", m_intake.startIntakeCommand().asProxy()
+                                                .withName("Start Intake"));
 
                 NamedCommands.registerCommand(
-                                "Transfer Stop", m_transfer.stopTransferCommand().asProxy());
+                                "DoIntake", m_cf.doIntake().asProxy()
+                                                .withName("Do Intake"));
+
+                NamedCommands.registerCommand(
+                                "Transfer To Sensor", m_cf.runToSensorCommand().asProxy()
+                                                .withName("TransferToSensor"));
+
+                NamedCommands.registerCommand(
+                                "Transfer Stop", m_transfer.stopTransferCommand().asProxy()
+                                                .withName("Transfer Stop"));
 
                 NamedCommands.registerCommand("Arm To Intake",
-                                m_arm.setGoalCommand(ArmConstants.pickupAngle).asProxy());
+                                m_arm.setGoalCommand(ArmConstants.pickupAngle).asProxy()
+                                                .withName("ArmToIntake"));
 
                 // NamedCommands.registerCommand("Shooter Low Speed",
                 // m_shooter.setRPMCommand(1000, false));
 
-                NamedCommands.registerCommand("Shoot", m_transfer.transferToShooterCommand().asProxy());
+                NamedCommands.registerCommand("Shoot", m_transfer.transferToShooterCommand().asProxy()
+                                .withName("Shoot"));
 
                 NamedCommands.registerCommand("Align Then Shoot", m_cf.alignShootCommand().asProxy());
 
                 NamedCommands.registerCommand("Arm Shooter SubWfr",
                                 m_cf.positionArmRunShooterSpecialCase(Constants.subwfrArmAngle,
-                                                Constants.subwfrShooterSpeed).asProxy()); // Constants.subwfrShooterSpeed
-                                                                                          // lower speed to decrease
-                                                                                          // time
+                                                Constants.subwfrShooterSpeed).asProxy()
+                                                .withName("Arm Shooter SubWfr")); // Constants.subwfrShooterSpeed
+                                                                                  // lower speed to decrease
+                                                                                  // time
 
                 NamedCommands.registerCommand("Arm Shooter Wing 1",
                                 m_cf.positionArmRunShooterSpecialCase(Constants.wing1ArmAngle,
-                                                Constants.wing1ShooterSpeed).asProxy());
+                                                Constants.wing1ShooterSpeed).asProxy()
+                                                .withName("Arm Shooter Wing 1"));
 
                 NamedCommands.registerCommand("Arm Shooter Wing 2",
                                 m_cf.positionArmRunShooterSpecialCase(Constants.wing2ArmAngle,
-                                                Constants.wing2ShooterSpeed).asProxy());
+                                                Constants.wing2ShooterSpeed).asProxy()
+                                                .withName("Arm Shooter Wing 2"));
 
                 NamedCommands.registerCommand("Arm Shooter Wing 3",
                                 m_cf.positionArmRunShooterSpecialCase(Constants.wing3ArmAngle,
-                                                Constants.wing3ShooterSpeed).asProxy());
+                                                Constants.wing3ShooterSpeed).asProxy()
+                                                .withName("Arm Shooter Wing 3"));
 
                 NamedCommands.registerCommand("Arm Shooter Amp Shoot",
                                 m_cf.positionArmRunShooterSpecialCase(Constants.ampStartArmAngle,
-                                                Constants.ampStartShooterSpeed).asProxy());
+                                                Constants.ampStartShooterSpeed).asProxy()
+                                                .withName("Arm Shooter Amp Shoot"));
 
                 NamedCommands.registerCommand("Arm Shooter Source",
                                 m_cf.positionArmRunShooterSpecialCase(Constants.shotSourceAngle,
-                                                Constants.shotSourceSpeed).asProxy());
+                                                Constants.shotSourceSpeed).asProxy()
+                                                .withName("Arm Shooter Source"));
 
-                NamedCommands.registerCommand("Stop Shooter", m_shooter.stopShooterCommand().asProxy());
+                NamedCommands.registerCommand("Stop Shooter", m_shooter.stopShooterCommand().asProxy()
+                                .withName("Stop Shooter"));
 
-                NamedCommands.registerCommand("LocatePickupNote", m_cf.autopickup());
+                NamedCommands.registerCommand("Pathfind to Pickup C4", m_cf.autopickup(FieldConstants.centerNote4Pickup)
+                                .withName("Pathfind to Pickup C4"));
+
+                NamedCommands.registerCommand("Pathfind to Pickup C5", m_cf.autopickup(FieldConstants.centerNote5Pickup)
+                                .withName("Pathfind to Pickup C5"));
 
         }
 

@@ -18,6 +18,7 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.Distance;
 import edu.wpi.first.units.Measure;
+import edu.wpi.first.units.Unit;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import frc.lib.config.SwerveModuleConstants;
@@ -242,6 +243,11 @@ public final class Constants {
                 public static final Pose2d centerNote3 = new Pose2d(8.28, 4.10, new Rotation2d());
                 public static final Pose2d centerNote4 = new Pose2d(8.28, 2.44, new Rotation2d());
                 public static final Pose2d centerNote5 = new Pose2d(8.28, 0.75, new Rotation2d());
+
+                public static final Pose2d centerNote4Pickup = new Pose2d(8.49, 2.32,
+                                new Rotation2d(Units.degreesToRadians(23.2)));
+                public static final Pose2d centerNote5Pickup = new Pose2d(8.5, 0.78,
+                                new Rotation2d(Units.degreesToRadians(-3.91)));
 
         }
 
@@ -559,7 +565,7 @@ public final class Constants {
                 public static final double voltageComp = 12;
                 public static final IdleMode transferIdleMode = IdleMode.kBrake;
                 public static final int transferContinuousCurrentLimit = 40;
-                public static double clearShooterTime = 0.6;
+                public static double clearShooterTime = .6;
                 public static double noNoteStopTime = 20;
                 public static double jogSpeed = 1;
 

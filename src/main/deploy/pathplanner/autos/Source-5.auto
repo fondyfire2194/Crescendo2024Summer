@@ -2,10 +2,10 @@
   "version": 1.0,
   "startingPose": {
     "position": {
-      "x": 1.34,
-      "y": 5.55
+      "x": 0.72,
+      "y": 4.4
     },
-    "rotation": 180.0
+    "rotation": 120.0
   },
   "command": {
     "type": "sequential",
@@ -24,13 +24,19 @@
           }
         },
         {
+          "type": "path",
+          "data": {
+            "pathName": "Source To Near Center 5"
+          }
+        },
+        {
           "type": "parallel",
           "data": {
             "commands": [
               {
-                "type": "path",
+                "type": "named",
                 "data": {
-                  "pathName": "Subwfr Shoot to Wing 2"
+                  "name": "Pathfind to Pickup C5"
                 }
               },
               {
@@ -43,13 +49,19 @@
           }
         },
         {
-          "type": "sequential",
+          "type": "parallel",
           "data": {
             "commands": [
               {
+                "type": "path",
+                "data": {
+                  "pathName": "Center 5 To Source Shoot"
+                }
+              },
+              {
                 "type": "named",
                 "data": {
-                  "name": "Arm Shooter Wing 2"
+                  "name": "Arm Shooter Source"
                 }
               }
             ]
@@ -66,40 +78,9 @@
           "data": {
             "commands": [
               {
-                "type": "path",
-                "data": {
-                  "pathName": "Subwfr Shoot to Wing 2"
-                }
-              },
-              {
                 "type": "named",
                 "data": {
-                  "name": "DoIntake"
-                }
-              }
-            ]
-          }
-        },
-        {
-          "type": "named",
-          "data": {
-            "name": "Arm Shooter Wing 2"
-          }
-        },
-        {
-          "type": "named",
-          "data": {
-            "name": "Shoot"
-          }
-        },
-        {
-          "type": "parallel",
-          "data": {
-            "commands": [
-              {
-                "type": "path",
-                "data": {
-                  "pathName": "Wing 2 to Center 3"
+                  "name": "Pathfind to Pickup C4"
                 }
               },
               {
@@ -118,13 +99,13 @@
               {
                 "type": "path",
                 "data": {
-                  "pathName": "Center 3 to Wing 2"
+                  "pathName": "Center 4 To Source Shoot"
                 }
               },
               {
                 "type": "named",
                 "data": {
-                  "name": "Arm Shooter Wing 2"
+                  "name": "Arm Shooter Source"
                 }
               }
             ]

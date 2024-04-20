@@ -16,6 +16,7 @@ import edu.wpi.first.math.controller.ProfiledPIDController;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.trajectory.TrapezoidProfile.State;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
@@ -32,9 +33,12 @@ import frc.robot.Constants;
 import frc.robot.Constants.ArmConstants;
 import frc.robot.Constants.CANIDConstants;
 import frc.robot.Pref;
+import monologue.Logged;
+import monologue.Annotations.Log;
+
 import static edu.wpi.first.units.Units.Volts;
 
-public class ArmSubsystem extends ProfiledPIDSubsystem {
+public class ArmSubsystem extends ProfiledPIDSubsystem implements Logged {
 
     public final CANSparkMax armMotor = new CANSparkMax(CANIDConstants.armID, MotorType.kBrushless);
 
@@ -57,7 +61,6 @@ public class ArmSubsystem extends ProfiledPIDSubsystem {
     public double armVolts;
 
     private double feedforward;
-    private int ctr;
 
     private double acceleration;
 
@@ -70,6 +73,8 @@ public class ArmSubsystem extends ProfiledPIDSubsystem {
     public double appliedVolts;
 
     public double armAngleRads;
+    @Log.NT(key = "armcurrentgoal")
+    public double currentGoalAngle;
 
     private PIDController pid = new PIDController(.1, 0.0, 0);
 
@@ -77,11 +82,18 @@ public class ArmSubsystem extends ProfiledPIDSubsystem {
 
     public double angleTolerance = ArmConstants.angleTolerance;
 
+    @Log.NT(key = "armenamble")
     public boolean enableArm;
+    @Log.NT(key = "armpidenambled")
+    public boolean armpidenabled;
 
     private double activeKv;
 
     private double lastGoal;
+    @Log.NT(key = "armatsetpoint")
+    public boolean armAtSetpoint;
+    @Log.NT(key = "simanglerads")
+    private double simAngleRads;
 
     public ArmSubsystem(boolean showScreens) {
         super(
@@ -185,7 +197,7 @@ public class ArmSubsystem extends ProfiledPIDSubsystem {
             armEncoder.setPosition(Units.degreesToRadians(15));
 
         }
-        setGoal(Units.degreesToRadians(18)); //15
+        setGoal(Units.degreesToRadians(18)); // 15
         // pid.setIZone(Units.degreesToRadians(.5));
         // pid.setIntegratorRange(-Units.degreesToRadians(.1),
         // Units.degreesToRadians(.1));
@@ -206,12 +218,18 @@ public class ArmSubsystem extends ProfiledPIDSubsystem {
     }
 
     public void periodicRobot() {
-
         armAngleRads = getAngleRadians();
         if (!enableArm) {
             setGoal(armAngleRads);
         }
+        getpidenebled();
 
+        if (RobotBase.isSimulation()) {
+            double diff = currentGoalAngle - simAngleRads;
+
+            if (diff != 0)
+                simAngleRads += diff / 10;
+        }
     }
 
     @Override
@@ -219,21 +237,8 @@ public class ArmSubsystem extends ProfiledPIDSubsystem {
 
         pidout = pid.calculate(armAngleRads, getController().getSetpoint().position);
 
-        // SmartDashboard.putNumber("CTR", ctr++);
-        // SmartDashboard.putNumber("PID", pidout);
-        // SmartDashboard.putNumber("ff", feedforward);
-        // SmartDashboard.putNumber("poserr", pid.getPositionError());
-        // SmartDashboard.putNumber("velerr", getController().getVelocityError());
-
         double tempv = getController().getSetpoint().velocity;
         double tempp = getController().getSetpoint().position;
-
-        // SmartDashboard.putNumber("TrapVel", tempv);
-        // SmartDashboard.putNumber("TrapPos", tempp);
-        // SmartDashboard.putNumber("MOTROAO", armMotor.getAppliedOutput());
-
-        // SmartDashboard.putNumber("ARMANFR", armAngleRads);
-        // SmartDashboard.putNumber("ARMANDG", Units.radiansToDegrees(armAngleRads));
 
         acceleration = (getController().getSetpoint().velocity - lastSpeed)
                 / (Timer.getFPGATimestamp() - lastTime);
@@ -242,14 +247,6 @@ public class ArmSubsystem extends ProfiledPIDSubsystem {
         // armfeedforward.calculate(getController().getSetpoint().position,
         // getController().getSetpoint().velocity,
         // acceleration);
-
-        // SmartDashboard.putNumber("KGVAL", Pref.getPref("armFFKg")
-        //         * Math.cos(getController().getSetpoint().position));
-        // SmartDashboard.putNumber("KVVAL", Pref.getPref("armFFKv")
-        //         * getController().getSetpoint().velocity);
-        // SmartDashboard.putNumber("KSVAL", Pref.getPref("armFFKs") *
-        //         Math.signum(getController().getSetpoint().velocity));
-        // SmartDashboard.putNumber("KAVAL", Pref.getPref("armFFKa") * acceleration);
 
         feedforward = Pref.getPref("armFFKs") *
                 Math.signum(getController().getSetpoint().velocity)
@@ -291,10 +288,11 @@ public class ArmSubsystem extends ProfiledPIDSubsystem {
 
     public Command setGoalCommand(double angleRads) {
         return Commands.sequence(
-                Commands.runOnce(() -> setTolerance(ArmConstants.angleTolerance)),
-                Commands.runOnce(() -> resetController()),
-                Commands.runOnce(() -> setGoal(angleRads), this),
-                Commands.runOnce(() -> enable(), this));
+                runOnce(() -> setTolerance(ArmConstants.angleTolerance)),
+                runOnce(() -> resetController()),
+                runOnce(() -> setGoal(angleRads)),
+                runOnce(() -> enable()),
+                runOnce(() -> SmartDashboard.putNumber("ENded", 911)));
     }
 
     public Command setGoalCommand(double angleRads, double tolerance) {
@@ -326,6 +324,7 @@ public class ArmSubsystem extends ProfiledPIDSubsystem {
         if (temp > ArmConstants.armMaxRadians)
             temp = ArmConstants.armMaxRadians;
         setGoal(temp);
+        currentGoalAngle = temp;
     }
 
     public void decrementArmAngle(double valdeg) {
@@ -334,18 +333,21 @@ public class ArmSubsystem extends ProfiledPIDSubsystem {
         if (temp < ArmConstants.armMinRadians)
             temp = ArmConstants.armMinRadians;
         setGoal(temp);
+        currentGoalAngle = temp;
     }
 
+    @Log.NT(key = "armgoal")
     public double getCurrentGoal() {
-        return getController().getGoal().position;
+        currentGoalAngle = getController().getGoal().position;
+        return currentGoalAngle;
     }
 
+    @Log.NT(key = "armrads")
     public double getAngleRadians() {
-        return getCanCoderRad();
-        // if (RobotBase.isReal())
-        // return armEncoder.getPosition();
-        // else
-        // return getCurrentGoal();
+        if (RobotBase.isReal())
+            return getCanCoderRad();
+        else
+            return simAngleRads;
     }
 
     public double getAngleDegrees() {
@@ -353,8 +355,8 @@ public class ArmSubsystem extends ProfiledPIDSubsystem {
     }
 
     public boolean atSetpoint() {
-        return Math.abs(getCurrentGoal() - getAngleRadians()) < angleTolerance;
-        // return getController().atSetpoint() || RobotBase.isSimulation();
+        armAtSetpoint = Math.abs(getCurrentGoal() - getAngleRadians()) < angleTolerance;
+        return armAtSetpoint;
     }
 
     public double getVoltsPerRadPerSec() {
@@ -395,6 +397,11 @@ public class ArmSubsystem extends ProfiledPIDSubsystem {
 
     public boolean onLimit() {
         return onPlusHardwareLimit() || onMinusHardwareLimit() || onPlusSoftwareLimit() || onMinusSoftwareLimit();
+    }
+
+    public boolean getpidenebled() {
+        armpidenabled = isEnabled();
+        return armpidenabled;
     }
 
     public void stop() {
@@ -452,7 +459,7 @@ public class ArmSubsystem extends ProfiledPIDSubsystem {
                 * Math.PI) + ArmConstants.cancoderOffsetRadians;
         if (temp > Math.PI)
             temp = temp - Math.PI;
-            return temp;
+        return temp;
     }
 
     public double getCanCoderRadPerSec() {

@@ -6,7 +6,6 @@ package frc.robot.subsystems;
 
 import java.util.Map;
 
-
 import com.revrobotics.CANSparkBase.ControlType;
 import com.revrobotics.CANSparkLowLevel.MotorType;
 import com.revrobotics.CANSparkMax;
@@ -14,8 +13,6 @@ import com.revrobotics.RelativeEncoder;
 import com.revrobotics.SparkPIDController;
 
 import edu.wpi.first.math.filter.SlewRateLimiter;
-import edu.wpi.first.wpilibj.DriverStation;
-import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
@@ -24,9 +21,11 @@ import frc.lib.util.CANSparkMaxUtil;
 import frc.lib.util.CANSparkMaxUtil.Usage;
 import frc.robot.Constants;
 import frc.robot.Constants.IntakeConstants;
+import monologue.Annotations.Log;
+import monologue.Logged;
 import frc.robot.Pref;
 
-public class IntakeSubsystem extends SubsystemBase {
+public class IntakeSubsystem extends SubsystemBase implements Logged {
 
   public CANSparkMax intakeMotor;
   RelativeEncoder intakeEncoder;
@@ -34,10 +33,12 @@ public class IntakeSubsystem extends SubsystemBase {
 
   private int loopctr;
   private boolean m_showScreens;
+  @Log.NT(key = "intakerun")
   private boolean runIntake;
   public boolean jogging;
   private SlewRateLimiter intakeLimiter = new SlewRateLimiter(1500);
- 
+  @Log.NT(key = "intakecommandrpm")
+  private double commandrpm;
 
   /** Creates a new Intake. */
   public IntakeSubsystem(boolean showScreens) {
@@ -99,6 +100,7 @@ public class IntakeSubsystem extends SubsystemBase {
     intakeMotor.stopMotor();
     intakeController.setReference(0, ControlType.kVelocity);
     resetRunIntake();
+    commandrpm = 0;
   }
 
   public Command stopIntakeCommand() {
@@ -132,12 +134,13 @@ public class IntakeSubsystem extends SubsystemBase {
     loopctr++;
 
     if (runIntake) {
-      //double rpm = intakeLimiter.calculate(Pref.getPref("IntakeSpeed"));
-      runAtVelocity(Pref.getPref("IntakeSpeed"));
+      // double rpm = intakeLimiter.calculate(Pref.getPref("IntakeSpeed"));
+      commandrpm = Pref.getPref("IntakeSpeed");
+      runAtVelocity(commandrpm);
     }
     if (!runIntake && !jogging) {
       stopMotor();
-      //intakeLimiter.reset(0);
+      // intakeLimiter.reset(0);
     }
   }
 
@@ -149,6 +152,7 @@ public class IntakeSubsystem extends SubsystemBase {
     runAtVelocity(IntakeConstants.reverseRPM);
   }
 
+  @Log.NT(key = "intakeAmps")
   public double getAmps() {
     return intakeMotor.getOutputCurrent();
   }
@@ -156,7 +160,7 @@ public class IntakeSubsystem extends SubsystemBase {
   public void setPID() {
     intakeController.setP(Pref.getPref("IntakeKp"));
     intakeController.setFF(IntakeConstants.intakeKFF);
-      }
+  }
 
   public Command clearFaultsCommand() {
     return Commands.runOnce(() -> intakeMotor.clearFaults());

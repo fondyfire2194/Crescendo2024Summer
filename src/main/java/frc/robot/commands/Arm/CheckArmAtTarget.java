@@ -4,6 +4,7 @@
 
 package frc.robot.commands.Arm;
 
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.subsystems.ArmSubsystem;
 
@@ -11,7 +12,6 @@ public class CheckArmAtTarget extends Command {
   /** Creates a new JogArm. */
   private ArmSubsystem m_arm;
   private int loopCtr;
-  
 
   public CheckArmAtTarget(ArmSubsystem arm) {
     // Use addRequirements() here to declare subsystem dependencies.
@@ -29,17 +29,18 @@ public class CheckArmAtTarget extends Command {
   @Override
   public void execute() {
     loopCtr++;
+    SmartDashboard.putNumber("Armlpctr", loopCtr);
   }
 
   // Called once the command ends or is interrupted.
   @Override
   public void end(boolean interrupted) {
-
+    loopCtr = 0; SmartDashboard.putNumber("Armlpctr", loopCtr);
   }
 
   // Returns true when the command should end.
   @Override
   public boolean isFinished() {
-    return loopCtr > 10 && m_arm.atSetpoint();
+    return loopCtr > 10 && m_arm.armAtSetpoint;
   }
 }

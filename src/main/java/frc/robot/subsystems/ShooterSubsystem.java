@@ -4,6 +4,10 @@
 
 package frc.robot.subsystems;
 
+import static edu.wpi.first.units.Units.Minute;
+import static edu.wpi.first.units.Units.Rotations;
+import static edu.wpi.first.units.Units.Volts;
+
 import java.util.Map;
 
 import com.revrobotics.CANSparkBase.ControlType;
@@ -14,11 +18,9 @@ import com.revrobotics.SparkPIDController;
 
 import edu.wpi.first.math.filter.SlewRateLimiter;
 import edu.wpi.first.wpilibj.RobotBase;
-import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.shuffleboard.BuiltInLayouts;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
 import edu.wpi.first.wpilibj.shuffleboard.ShuffleboardLayout;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -28,13 +30,11 @@ import frc.lib.util.CANSparkMaxUtil;
 import frc.lib.util.CANSparkMaxUtil.Usage;
 import frc.robot.Constants;
 import frc.robot.Constants.ShooterConstants;
+import monologue.Annotations.Log;
+import monologue.Logged;
 import frc.robot.Pref;
 
-import static edu.wpi.first.units.Units.Minute;
-import static edu.wpi.first.units.Units.Rotations;
-import static edu.wpi.first.units.Units.Volts;
-
-public class ShooterSubsystem extends SubsystemBase {
+public class ShooterSubsystem extends SubsystemBase implements Logged {
 
   public CANSparkMax topRoller;
   public SparkPIDController topController;
@@ -43,11 +43,16 @@ public class ShooterSubsystem extends SubsystemBase {
 
   public CANSparkMax bottomRoller;
   RelativeEncoder bottomEncoder;
-
+  @Log.NT(key = "shootercommandrpm")
   public double commandRPM = 500;
 
+  private double topSimRPM = 0;
+  private double bottomSimRPM = 0;
+  @Log.NT(key = "shooteratspeed;")
+  private boolean shootersatspeed;
   public boolean m_showScreens;
 
+  @Log.NT(key = "shooterrunatvel")
   private boolean runShooterVel;
   private double topBottomSpeedRatio = 1;
 
@@ -141,7 +146,7 @@ public class ShooterSubsystem extends SubsystemBase {
     encoder.setAverageDepth(4);
     encoder.setMeasurementPeriod(32);
     motor.enableVoltageCompensation(Constants.ShooterConstants.voltageComp);
-    
+
     motor.burnFlash();
     encoder.setPosition(0.0);
   }
@@ -154,6 +159,8 @@ public class ShooterSubsystem extends SubsystemBase {
     bottomRoller.stopMotor();
     topSpeedLimiter.reset(0);
     bottomSpeedLimiter.reset(0);
+    topSimRPM = 0;
+    bottomSimRPM = 0;
   }
 
   public Command stopShooterCommand() {
@@ -166,6 +173,7 @@ public class ShooterSubsystem extends SubsystemBase {
         Commands.runOnce(() -> setRunShooter(), this));
   }
 
+  @Log.NT(key = "shooterrun")
   public Command startShooterCommandAmp(double rpm) {
     return Commands.parallel(
         Commands.runOnce(() -> commandRPM = rpm),
@@ -184,6 +192,7 @@ public class ShooterSubsystem extends SubsystemBase {
     return runShooterVel;
   }
 
+  @Log.NT(key = "shootercommandrpm")
   public void setCommandRPM(double rpm) {
     commandRPM = rpm;
   }
@@ -192,22 +201,20 @@ public class ShooterSubsystem extends SubsystemBase {
     return commandRPM;
   }
 
+  @Log.NT(key = "shootertoprpm")
   public double getRPMTop() {
     if (RobotBase.isReal())
       return topEncoder.getVelocity();
-    if (RobotBase.isSimulation() && runShooterVel) {
-      return commandRPM;
-    } else
-      return 0;
+    else
+      return topSimRPM;
   }
 
+  @Log.NT(key = "shooterbottomrpm")
   public double getRPMBottom() {
     if (RobotBase.isReal())
       return bottomEncoder.getVelocity();
-    if (RobotBase.isSimulation() && runShooterVel) {
-      return commandRPM;
-    } else
-      return 0;
+    else
+      return bottomSimRPM;
   }
 
   public void increaseShooterRPM(double val) {
@@ -239,7 +246,8 @@ public class ShooterSubsystem extends SubsystemBase {
   }
 
   public boolean bothAtSpeed(double pct) {
-    return topAtSpeed(pct) && bottomAtSpeed(pct);
+    shootersatspeed = topAtSpeed(pct) && bottomAtSpeed(pct);
+    return shootersatspeed;
   }
 
   public void setShooterSpeedRatio(double ratio) {
@@ -260,10 +268,12 @@ public class ShooterSubsystem extends SubsystemBase {
     return topBottomSpeedRatio;
   }
 
+  @Log.NT(key = "shootertopamps")
   public double getTopAmps() {
     return topRoller.getOutputCurrent();
   }
 
+  @Log.NT(key = "shooterbottomamps")
   public double getBottomAmps() {
     return bottomRoller.getOutputCurrent();
   }
@@ -283,18 +293,39 @@ public class ShooterSubsystem extends SubsystemBase {
   }
 
   @Override
+  public void simulationPeriodic() {
+    double simrpmdiff = commandRPM - topSimRPM;
+    double speedAdder = 50;// every 20 ms so 1000 per sec
+    if (simrpmdiff < 0)
+      speedAdder = -speedAdder;
+    if (topSimRPM != commandRPM)
+      topSimRPM += speedAdder;
+
+    simrpmdiff = commandRPM - bottomSimRPM;
+    speedAdder = 50;
+    if (simrpmdiff < 0)
+      speedAdder = -speedAdder;
+    if (bottomSimRPM != commandRPM)
+      bottomSimRPM += speedAdder;
+
+  }
+
+  @Override
   public void periodic() {
     // topBottomSpeedRatio = Pref.getPref("ShooterSpeedRatio");
 
-    // SmartDashboard.putNumber("TOPVolts", topRoller.get() * RobotController.getBatteryVoltage());
-    // SmartDashboard.putNumber("BotVolts", bottomRoller.get() * RobotController.getBatteryVoltage());
+    // SmartDashboard.putNumber("TOPVolts", topRoller.get() *
+    // RobotController.getBatteryVoltage());
+    // SmartDashboard.putNumber("BotVolts", bottomRoller.get() *
+    // RobotController.getBatteryVoltage());
 
     if (runShooterVel) {
       double bottomrpm = getCommandRPM();
       double toprpm = bottomrpm * topBottomSpeedRatio;
-
-      topController.setReference(topSpeedLimiter.calculate(toprpm), ControlType.kVelocity, 0);
-      bottomController.setReference(bottomSpeedLimiter.calculate(bottomrpm), ControlType.kVelocity, 0);
+      if (RobotBase.isReal()) {
+        topController.setReference(topSpeedLimiter.calculate(toprpm), ControlType.kVelocity, 0);
+        bottomController.setReference(bottomSpeedLimiter.calculate(bottomrpm), ControlType.kVelocity, 0);
+      }
     } else {
       stopMotors();
     }

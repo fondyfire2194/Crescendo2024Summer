@@ -6,6 +6,7 @@ package frc.robot.commands.Transfer;
 
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import frc.robot.subsystems.IntakeSubsystem;
@@ -52,6 +53,6 @@ public class TransferIntakeToSensor extends Command {
   // Returns true when the command should end.
   @Override
   public boolean isFinished() {
-    return m_transfer.noteAtIntake();//sensorDebouncer.calculate(m_transfer.noteAtIntake());
+    return m_transfer.noteAtIntake() || RobotBase.isSimulation() && endTimer.hasElapsed(1);// sensorDebouncer.calculate(m_transfer.noteAtIntake());
   }
 }

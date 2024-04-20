@@ -4,6 +4,11 @@
 
 package frc.robot.commands;
 
+import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.path.PathConstraints;
+
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.GenericHID.RumbleType;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -15,6 +20,7 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import frc.robot.Constants;
 import frc.robot.Constants.ArmConstants;
 import frc.robot.Constants.CameraConstants;
+import frc.robot.Constants.FieldConstants;
 import frc.robot.LimelightHelpers;
 import frc.robot.commands.Arm.CheckArmAtTarget;
 import frc.robot.commands.Drive.AutoPickupNote;
@@ -27,9 +33,11 @@ import frc.robot.subsystems.LimelightVision;
 import frc.robot.subsystems.ShooterSubsystem;
 import frc.robot.subsystems.SwerveSubsystem;
 import frc.robot.subsystems.TransferSubsystem;
+import monologue.Logged;
+import monologue.Annotations.Log;
 
 /** Add your docs here. */
-public class CommandFactory {
+public class CommandFactory implements Logged {
 
         private final SwerveSubsystem m_swerve;
 
@@ -57,10 +65,14 @@ public class CommandFactory {
                 m_llv = llv;
         }
 
-        public Command autopickup() {
-                return new AutoPickupNote(m_swerve, m_transfer, m_intake, m_llv,
-                                CameraConstants.rearCamera).asProxy();
-
+        public Command autopickup(Pose2d targetPose) {
+                return AutoBuilder.pathfindToPose(
+                                targetPose,
+                                new PathConstraints(
+                                                3.25, 4.0,
+                                                Units.degreesToRadians(360), Units.degreesToRadians(540)),
+                                0,
+                                0);
         }
 
         public Command positionArmRunShooterByDistance(double distance) {
@@ -71,23 +83,26 @@ public class CommandFactory {
                                 new CheckShooterAtSpeed(m_shooter, .2));
         }
 
+        // @Log.NT(key = "posarmrunshootercommand")
         public Command positionArmRunShooterSpecialCase(double armAngleDeg, double shooterSpeed) {
-                return new ParallelCommandGroup(
+                return Commands.parallel(
                                 m_arm.setGoalCommand(Units.degreesToRadians(armAngleDeg)),
-                                m_shooter.startShooterCommand(shooterSpeed),
                                 new CheckArmAtTarget(m_arm),
-                                // m_shooter.startShooterCommand(shooterSpeed),
-                                new CheckShooterAtSpeed(m_shooter, .2));
+                                m_shooter.startShooterCommand(shooterSpeed),
+                                new CheckShooterAtSpeed(m_shooter, .2)
+                                                .andThen(Commands.runOnce(
+                                                                () -> SmartDashboard.putNumber("POEnded", 912))));
         }
 
         public Command positionArmRunShooterAmp(double armAngleDeg, double shooterSpeed) {
                 return new ParallelCommandGroup(
                                 m_arm.setGoalCommand(Units.degreesToRadians(armAngleDeg)),
-                                new CheckArmAtTarget(m_arm),
                                 m_shooter.startShooterCommandAmp(shooterSpeed),
+                                new CheckArmAtTarget(m_arm),
                                 new CheckShooterAtSpeed(m_shooter, .2));
         }
 
+        // @Log.NT(key = "dointakecommand")
         public Command doIntake() {
                 return new ParallelCommandGroup(
                                 m_intake.startIntakeCommand(),

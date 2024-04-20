@@ -6,8 +6,6 @@ package frc.robot.subsystems;
 
 import java.util.Map;
 
-import com.playingwithfusion.TimeOfFlight;
-import com.playingwithfusion.TimeOfFlight.RangingMode;
 import com.revrobotics.CANSparkBase.ControlType;
 import com.revrobotics.CANSparkBase.FaultID;
 import com.revrobotics.CANSparkLowLevel.MotorType;
@@ -17,9 +15,8 @@ import com.revrobotics.RelativeEncoder;
 import com.revrobotics.SparkLimitSwitch;
 import com.revrobotics.SparkPIDController;
 
-import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.RobotBase;
 import edu.wpi.first.wpilibj.shuffleboard.Shuffleboard;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
@@ -27,20 +24,22 @@ import frc.lib.util.CANSparkMaxUtil;
 import frc.lib.util.CANSparkMaxUtil.Usage;
 import frc.robot.Constants.CANIDConstants;
 import frc.robot.Constants.TransferConstants;
-
+import monologue.Annotations.Log;
+import monologue.Logged;
 import frc.robot.Pref;
 
-public class TransferSubsystem extends SubsystemBase {
+public class TransferSubsystem extends SubsystemBase implements Logged {
 
   public CANSparkMax transferMotor;
   public SparkPIDController transferController;
   RelativeEncoder transferEncoder;
 
-  //private final TimeOfFlight m_detectNoteSensor = new TimeOfFlight(CANIDConstants.transferDistanceSensorID);
-
   public boolean m_showScreens;
 
   private int loopctr;
+
+  @Log.NT(key = "transfercommandrpm")
+  private double commandrpm;
 
   public SparkLimitSwitch m_limitSwitch;
 
@@ -55,8 +54,6 @@ public class TransferSubsystem extends SubsystemBase {
 
     m_limitSwitch = transferMotor.getForwardLimitSwitch(SparkLimitSwitch.Type.kNormallyOpen);
     m_limitSwitch.enableLimitSwitch(true);
-
-    //m_detectNoteSensor.setRangingMode(RangingMode.Short, 40);
 
     if (m_showScreens) {
 
@@ -75,9 +72,9 @@ public class TransferSubsystem extends SubsystemBase {
           .withPosition(4, 1);
 
       // Shuffleboard.getTab("IntakeSubsystem").addNumber("NoteSensorInches",
-      //     () -> round2dp(getSensorDistanceInches(), 1))
-      //     .withSize(1, 1)
-      //     .withPosition(3, 2);
+      // () -> round2dp(getSensorDistanceInches(), 1))
+      // .withSize(1, 1)
+      // .withPosition(3, 2);
 
       Shuffleboard.getTab("IntakeSubsystem").addBoolean("NoteSensed", () -> noteAtIntake())
           .withSize(1, 1)
@@ -115,15 +112,17 @@ public class TransferSubsystem extends SubsystemBase {
   }
 
   public void stopMotor() {
-    transferController.setReference(0, ControlType.kVelocity);
+    runAtVelocity(0);
     transferMotor.stopMotor();
+    commandrpm = 0;
 
   }
 
   public Command stopTransferCommand() {
+    commandrpm = 0;
     return Commands.runOnce(() -> stopMotor(), this);
   }
-
+  @Log.NT(key = "transfertoshootercommand")
   public Command transferToShooterCommand() {
     return Commands
         .run(() -> transferToShooter(), this)
@@ -133,38 +132,30 @@ public class TransferSubsystem extends SubsystemBase {
 
   public void transferToShooter() {
     enableLimitSwitch(false);
-    transferController.setReference(Pref.getPref("TransferToShootSpeed"), ControlType.kVelocity);
+    commandrpm = Pref.getPref("TransferToShootSpeed");
+    runAtVelocity(commandrpm);
   }
 
   public void runToSensor() {
     enableLimitSwitch(true);
-    transferController.setReference(Pref.getPref("TransferIntakingSpeed"), ControlType.kVelocity);
+    commandrpm = Pref.getPref("TransferIntakingSpeed");
+    runAtVelocity(commandrpm);
+
   }
 
-  // public double getSensorDistanceInches() {
-  //   return Units.metersToInches(m_detectNoteSensor.getRange() / 1000);
-  // }
+  public void runAtVelocity(double rpm) {
+    if (RobotBase.isReal())
+      transferController.setReference(rpm, ControlType.kVelocity);
+  }
 
-  // public boolean noteAtIntake() {
-  //   return getSensorDistanceInches() > 0
-  //       && getSensorDistanceInches() < Pref.getPref("SensorDistance");
-  // }
-
-  public boolean noteAtIntake() { //we can get rid of the TimeOfFlight
+  @Log.NT(key = "transfernoteatintake")
+  public boolean noteAtIntake() { // we can get rid of the TimeOfFlight
     return m_limitSwitch.isPressed();
   }
 
   @Override
   public void periodic() {
     // This method will be called once per scheduler run
-
-    //SmartDashboard.putNumber("SENSINCHES", getSensorDistanceInches());
-    // loopctr++;
-    // SmartDashboard.putBoolean("LSE", m_limitSwitch.isLimitSwitchEnabled());
-
-    // SmartDashboard.putBoolean("PLLIM", m_limitSwitch.isPressed());
-    
-
   }
 
   public void enableLimitSwitch(boolean enable) {
@@ -175,12 +166,17 @@ public class TransferSubsystem extends SubsystemBase {
     return m_limitSwitch.isLimitSwitchEnabled();
   }
 
+  @Log.NT(key = "transferamps")
   public double getAmps() {
     return transferMotor.getOutputCurrent();
   }
 
+  @Log.NT(key = "transferrpm")
   public double getRPM() {
-    return transferEncoder.getVelocity();
+    if (RobotBase.isReal())
+      return transferEncoder.getVelocity();
+    else
+      return commandrpm;
   }
 
   public void setVelPID() {
